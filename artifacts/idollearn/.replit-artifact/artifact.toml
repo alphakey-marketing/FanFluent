@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "IdolLearn"
+version = "1.0.0"
+id = "artifacts/idollearn"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21337
+
+[services.development]
+run = "pnpm --filter @workspace/idollearn run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/idollearn", "run", "build" ]
+publicDir = "artifacts/idollearn/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21337"
+BASE_PATH = "/"
