@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { createClient } from "@/lib/supabase/client";
+import { authedFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import VocabBreakdown from "@/components/VocabBreakdown";
 import CultureNote from "@/components/CultureNote";
@@ -55,14 +56,13 @@ export default function PostDetailPage() {
       }
       if (!cancelled) setPost(postData as Post);
 
-      const { data: analysisData } = await supabase
-        .from("post_analysis")
-        .select("*")
-        .eq("post_id", id)
-        .single();
-
+      // Fetch analysis server-side so tier-gating is enforced on the backend
+      const res = await authedFetch(`/api/post-analysis/${id}`);
       if (!cancelled) {
-        setAnalysis(analysisData as PostAnalysis | null);
+        if (res.ok) {
+          const data = await res.json();
+          setAnalysis(data as PostAnalysis);
+        }
         setLoading(false);
       }
     }
@@ -135,7 +135,7 @@ export default function PostDetailPage() {
           </p>
         </section>
 
-        {/* Summary (free) */}
+        {/* Summary (always shown if available — server returns summary-only for free tier) */}
         {analysis?.summary && (
           <section className="rounded-xl border border-gray-200 bg-[#f7f6f2] p-5">
             <h2 className="text-xs font-semibold text-[#01696f] mb-2 uppercase tracking-wide">
@@ -145,7 +145,7 @@ export default function PostDetailPage() {
           </section>
         )}
 
-        {/* Paid content */}
+        {/* Paid content — only present in API response for paid/admin tier */}
         {isPaid && analysis ? (
           <>
             {analysis.full_translation && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import AdminPostForm from "@/components/AdminPostForm";
+import { authedFetch } from "@/lib/api";
 import type { Post } from "@/types";
 
 export default function AdminPage() {
@@ -15,7 +16,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/admin/posts").then(async (res) => {
+    authedFetch("/api/admin/posts").then(async (res) => {
       if (cancelled) return;
       if (res.status === 401 || res.status === 403) {
         navigate("/feed");

@@ -6,20 +6,33 @@ const router = Router();
 
 // POST /api/webhook/lemonsqueezy
 router.post("/webhook/lemonsqueezy", async (req, res) => {
-  const body = JSON.stringify(req.body);
+  const rawBody = req.rawBody;
   const signature = req.headers["x-signature"] as string | undefined;
+  const signingSecret = process.env["LEMONSQUEEZY_SIGNING_SECRET"];
 
-  if (!process.env["LEMONSQUEEZY_SIGNING_SECRET"]) {
+  if (!signingSecret) {
     res.status(500).json({ error: "Webhook secret not configured" });
     return;
   }
 
+  if (!rawBody || !signature) {
+    res.status(400).json({ error: "Missing body or signature" });
+    return;
+  }
+
   const hash = crypto
-    .createHmac("sha256", process.env["LEMONSQUEEZY_SIGNING_SECRET"])
-    .update(body)
+    .createHmac("sha256", signingSecret)
+    .update(rawBody)
     .digest("hex");
 
-  if (hash !== signature) {
+  const hashBuf = Buffer.from(hash, "hex");
+  const sigBuf = Buffer.from(signature, "hex");
+
+  const isValid =
+    hashBuf.length === sigBuf.length &&
+    crypto.timingSafeEqual(hashBuf, sigBuf);
+
+  if (!isValid) {
     res.status(401).json({ error: "Invalid signature" });
     return;
   }

@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
+import { authedFetch } from "@/lib/api";
 import type { Post, PostStatus } from "@/types";
 
 interface AdminPostFormProps {
@@ -29,7 +30,7 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/admin/posts", {
+      const res = await authedFetch("/api/admin/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -49,14 +50,14 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
     setActionLoading(postId + action);
     try {
       if (action === "process") {
-        await fetch("/api/process-post", {
+        await authedFetch("/api/process-post", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ postId }),
         });
       } else {
         const status = action === "publish" ? "published" : "processed";
-        await fetch("/api/admin/posts", {
+        await authedFetch("/api/admin/posts", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ postId, status }),
