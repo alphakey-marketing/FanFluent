@@ -98,7 +98,7 @@ export default function FeedPage() {
               🔓 升級解鎖詞彙、文化與文法完整解析
             </p>
             <Button asChild size="sm">
-              <Link href="/post/upgrade">了解更多</Link>
+              <Link href="/upgrade">了解更多</Link>
             </Button>
           </div>
         )}
