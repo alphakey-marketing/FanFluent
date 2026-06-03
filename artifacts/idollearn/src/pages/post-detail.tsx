@@ -10,19 +10,13 @@ import PaywallBanner from "@/components/PaywallBanner";
 import { formatDate } from "@/lib/utils";
 import type { Post, PostAnalysis, UserTier } from "@/types";
 
-const MONTHLY_URL =
-  "https://fanfluent.lemonsqueezy.com/checkout/buy/" +
-  (import.meta.env.VITE_LEMONSQUEEZY_MONTHLY_VARIANT_ID ?? "");
-const LIFETIME_URL =
-  "https://fanfluent.lemonsqueezy.com/checkout/buy/" +
-  (import.meta.env.VITE_LEMONSQUEEZY_LIFETIME_VARIANT_ID ?? "");
-
 export default function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const [post, setPost] = useState<Post | null>(null);
   const [analysis, setAnalysis] = useState<PostAnalysis | null>(null);
   const [userTier, setUserTier] = useState<UserTier>("free");
+  const [checkoutLinks, setCheckoutLinks] = useState<{ pro: string | null; max: string | null }>({ pro: null, max: null });
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -34,33 +28,30 @@ export default function PostDetailPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate("/auth/login"); return; }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("tier")
-        .eq("id", user.id)
-        .single();
+      const [profileRes, postRes, linksRes] = await Promise.all([
+        supabase.from("profiles").select("tier").eq("id", user.id).single(),
+        supabase.from("posts").select("*").eq("id", id).eq("status", "published").single(),
+        fetch("/api/checkout-links"),
+      ]);
 
-      const tier: UserTier = (profile?.tier as UserTier) ?? "free";
-      if (!cancelled) setUserTier(tier);
+      if (cancelled) return;
 
-      const { data: postData } = await supabase
-        .from("posts")
-        .select("*")
-        .eq("id", id)
-        .eq("status", "published")
-        .single();
+      const tier: UserTier = (profileRes.data?.tier as UserTier) ?? "free";
+      setUserTier(tier);
 
-      if (!postData) {
-        if (!cancelled) setNotFound(true);
-        return;
+      if (linksRes.ok) {
+        const links = await linksRes.json();
+        setCheckoutLinks(links);
       }
-      if (!cancelled) setPost(postData as Post);
+
+      if (!postRes.data) { setNotFound(true); return; }
+      setPost(postRes.data as Post);
 
       // Fetch analysis server-side so tier-gating is enforced on the backend
-      const res = await authedFetch(`/api/post-analysis/${id}`);
+      const analysisRes = await authedFetch(`/api/post-analysis/${id}`);
       if (!cancelled) {
-        if (res.ok) {
-          const data = await res.json();
+        if (analysisRes.ok) {
+          const data = await analysisRes.json();
           setAnalysis(data as PostAnalysis);
         }
         setLoading(false);
@@ -135,7 +126,7 @@ export default function PostDetailPage() {
           </p>
         </section>
 
-        {/* Summary (always shown if available — server returns summary-only for free tier) */}
+        {/* Summary — always shown; server returns summary-only for free tier */}
         {analysis?.summary && (
           <section className="rounded-xl border border-gray-200 bg-[#f7f6f2] p-5">
             <h2 className="text-xs font-semibold text-[#01696f] mb-2 uppercase tracking-wide">
@@ -177,8 +168,8 @@ export default function PostDetailPage() {
         ) : (
           !isPaid && (
             <PaywallBanner
-              monthlyUrl={MONTHLY_URL}
-              lifetimeUrl={LIFETIME_URL}
+              proUrl={checkoutLinks.pro}
+              maxUrl={checkoutLinks.max}
             />
           )
         )}

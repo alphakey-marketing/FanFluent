@@ -4,6 +4,7 @@ import adminPostsRouter from "./admin-posts";
 import processPostRouter from "./process-post";
 import postAnalysisRouter from "./post-analysis";
 import webhookLemonSqueezyRouter from "./webhook-lemonsqueezy";
+import checkoutLinksRouter from "./checkout-links";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(adminPostsRouter);
 router.use(processPostRouter);
 router.use(postAnalysisRouter);
 router.use(webhookLemonSqueezyRouter);
+router.use(checkoutLinksRouter);
 
 export default router;
