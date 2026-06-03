@@ -6,12 +6,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import { authedFetch } from "@/lib/api";
-import type { Post, PostStatus } from "@/types";
+import type { Post, PostStatus, PostType } from "@/types";
 
 interface AdminPostFormProps {
   posts: Post[];
   onRefresh: () => void;
 }
+
+const POST_TYPE_LABELS: Record<PostType, string> = {
+  post: "原文貼文",
+  reply: "回覆",
+  retweet: "轉發（純轉）",
+  quote_repost: "引用轉發",
+};
 
 export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) {
   const [loading, setLoading] = useState(false);
@@ -19,25 +26,60 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
   const [form, setForm] = useState({
     original_text: "",
     source_platform: "x" as "x" | "instagram",
+    post_type: "post" as PostType,
     source_url: "",
     post_date: "",
     image_url: "",
+    retweeted_text: "",
+    retweeted_author: "",
+    retweeted_url: "",
   });
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const isRetweet = form.post_type === "retweet";
+  const isQuoteRepost = form.post_type === "quote_repost";
+  const showRetweetedFields = isRetweet || isQuoteRepost;
 
   async function handleImport(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
     try {
+      const body: Record<string, string> = {
+        source_platform: form.source_platform,
+        post_type: form.post_type,
+      };
+      if (form.original_text) body.original_text = form.original_text;
+      if (form.source_url) body.source_url = form.source_url;
+      if (form.post_date) body.post_date = form.post_date;
+      if (form.image_url) body.image_url = form.image_url;
+      if (showRetweetedFields) {
+        if (form.retweeted_text) body.retweeted_text = form.retweeted_text;
+        if (form.retweeted_author) body.retweeted_author = form.retweeted_author;
+        if (form.retweeted_url) body.retweeted_url = form.retweeted_url;
+      }
+
       const res = await authedFetch("/api/admin/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Import failed");
-      setMessage({ type: "success", text: "文章已匯入，正在處理 AI 分析…" });
-      setForm({ original_text: "", source_platform: "x", source_url: "", post_date: "", image_url: "" });
+      const successMsg = isRetweet
+        ? "轉發已匯入（純轉發，無需 AI 分析）"
+        : "文章已匯入，正在處理 AI 分析…";
+      setMessage({ type: "success", text: successMsg });
+      setForm({
+        original_text: "",
+        source_platform: "x",
+        post_type: "post",
+        source_url: "",
+        post_date: "",
+        image_url: "",
+        retweeted_text: "",
+        retweeted_author: "",
+        retweeted_url: "",
+      });
       onRefresh();
     } catch {
       setMessage({ type: "error", text: "匯入失敗，請重試。" });
@@ -74,6 +116,7 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
     pending: "pending",
     processed: "processed",
     published: "published",
+    skipped: "pending",
   };
 
   return (
@@ -82,18 +125,22 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <h2 className="font-semibold text-lg mb-4">匯入新貼文</h2>
         <form onSubmit={handleImport} className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="original_text">日文原文 *</Label>
-            <Textarea
-              id="original_text"
-              required
-              rows={5}
-              placeholder="貼上武田航平的原文…"
-              value={form.original_text}
-              onChange={(e) => setForm({ ...form, original_text: e.target.value })}
-            />
-          </div>
+          {/* Post type + platform row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="post_type">貼文類型 *</Label>
+              <select
+                id="post_type"
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#01696f]"
+                value={form.post_type}
+                onChange={(e) => setForm({ ...form, post_type: e.target.value as PostType })}
+              >
+                <option value="post">原文貼文</option>
+                <option value="reply">回覆（Reply）</option>
+                <option value="retweet">純轉發（Retweet / Repost）</option>
+                <option value="quote_repost">引用轉發（Quote Repost）</option>
+              </select>
+            </div>
             <div className="space-y-1">
               <Label htmlFor="source_platform">來源平台</Label>
               <select
@@ -108,6 +155,68 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
                 <option value="instagram">Instagram</option>
               </select>
             </div>
+          </div>
+
+          {/* Idol's own text — not shown for pure retweets */}
+          {!isRetweet && (
+            <div className="space-y-1">
+              <Label htmlFor="original_text">
+                {isQuoteRepost ? "藝人自己的評論 *" : "日文原文 *"}
+              </Label>
+              <Textarea
+                id="original_text"
+                required={!isRetweet}
+                rows={5}
+                placeholder={
+                  isQuoteRepost
+                    ? "貼上武田航平對轉發貼文的評論…"
+                    : "貼上武田航平的原文…"
+                }
+                value={form.original_text}
+                onChange={(e) => setForm({ ...form, original_text: e.target.value })}
+              />
+            </div>
+          )}
+
+          {/* Retweeted content — shown for retweet & quote_repost */}
+          {showRetweetedFields && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+              <p className="text-xs font-medium text-amber-700">
+                {isRetweet ? "轉發來源" : "被引用的貼文"}
+              </p>
+              <div className="space-y-1">
+                <Label htmlFor="retweeted_author">原作者（帳號或顯示名稱）</Label>
+                <Input
+                  id="retweeted_author"
+                  placeholder="@username 或顯示名稱"
+                  value={form.retweeted_author}
+                  onChange={(e) => setForm({ ...form, retweeted_author: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="retweeted_text">被轉發的內容</Label>
+                <Textarea
+                  id="retweeted_text"
+                  rows={4}
+                  placeholder="貼上被轉發的原始貼文內容…"
+                  value={form.retweeted_text}
+                  onChange={(e) => setForm({ ...form, retweeted_text: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="retweeted_url">被轉發貼文的連結</Label>
+                <Input
+                  id="retweeted_url"
+                  type="url"
+                  placeholder="https://…"
+                  value={form.retweeted_url}
+                  onChange={(e) => setForm({ ...form, retweeted_url: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="post_date">發文日期</Label>
               <Input
@@ -117,8 +226,6 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
                 onChange={(e) => setForm({ ...form, post_date: e.target.value })}
               />
             </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="source_url">原文連結</Label>
               <Input
@@ -129,24 +236,31 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
                 onChange={(e) => setForm({ ...form, source_url: e.target.value })}
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="image_url">圖片連結</Label>
-              <Input
-                id="image_url"
-                type="url"
-                placeholder="https://…"
-                value={form.image_url}
-                onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-              />
-            </div>
           </div>
+          <div className="space-y-1">
+            <Label htmlFor="image_url">圖片連結</Label>
+            <Input
+              id="image_url"
+              type="url"
+              placeholder="https://…"
+              value={form.image_url}
+              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+            />
+          </div>
+
+          {isRetweet && (
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-md px-3 py-2 border border-amber-200">
+              純轉發不含藝人原創文字，匯入後將自動跳過 AI 分析。
+            </p>
+          )}
+
           {message && (
             <p className={`text-sm ${message.type === "success" ? "text-green-600" : "text-red-600"}`}>
               {message.text}
             </p>
           )}
           <Button type="submit" disabled={loading}>
-            {loading ? "處理中…" : "匯入並分析"}
+            {loading ? "處理中…" : isRetweet ? "匯入轉發" : "匯入並分析"}
           </Button>
         </form>
       </div>
@@ -162,6 +276,7 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
               <tr className="border-b bg-gray-50">
                 <th className="text-left px-4 py-3 font-medium text-gray-500">日期</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">原文（節錄）</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">類型</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">平台</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">狀態</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">操作</th>
@@ -170,7 +285,7 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
             <tbody>
               {posts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-400">
+                  <td colSpan={6} className="text-center py-8 text-gray-400">
                     尚無貼文
                   </td>
                 </tr>
@@ -182,8 +297,17 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
                     </td>
                     <td className="px-4 py-3 max-w-xs">
                       <p className="truncate font-japanese text-gray-800">
-                        {post.original_text.slice(0, 60)}…
+                        {post.original_text
+                          ? post.original_text.slice(0, 60) + "…"
+                          : post.retweeted_text
+                          ? `[轉] ${post.retweeted_text.slice(0, 50)}…`
+                          : "—"}
                       </p>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <Badge variant="outline" className="text-xs">
+                        {POST_TYPE_LABELS[post.post_type ?? "post"]}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="outline" className="text-xs">

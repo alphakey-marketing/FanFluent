@@ -27,8 +27,54 @@ async function callOpenRouter(prompt: string, model = "openai/gpt-4o"): Promise<
   return data.choices[0].message.content;
 }
 
-function buildSummaryPrompt(originalText: string): string {
-  return `You are a Japanese language assistant. 
+type PostRow = {
+  original_text: string | null;
+  post_type: string;
+  retweeted_text: string | null;
+  retweeted_author: string | null;
+};
+
+function buildSummaryPrompt(post: PostRow): string {
+  if (post.post_type === "quote_repost") {
+    return `You are a Japanese language assistant.
+The following is a quote repost by a Japanese actor (武田航平).
+The actor's own comment is shown first, followed by the post they are quoting.
+Read only the actor's comment and summarise it.
+
+Return ONLY a JSON object in this format:
+{
+  "summary": "A 1-2 sentence plain-language summary of the actor's comment in Traditional Chinese (繁體中文)"
+}
+
+Actor's comment:
+"""
+${post.original_text ?? ""}
+"""
+
+Quoted post${post.retweeted_author ? ` (by ${post.retweeted_author})` : ""}:
+"""
+${post.retweeted_text ?? ""}
+"""`;
+  }
+
+  if (post.post_type === "reply") {
+    return `You are a Japanese language assistant.
+The following is a reply posted by a Japanese actor (武田航平) on social media.
+Read the reply and summarise it.
+
+Return ONLY a JSON object in this format:
+{
+  "summary": "A 1-2 sentence plain-language summary in Traditional Chinese (繁體中文)"
+}
+
+Reply:
+"""
+${post.original_text ?? ""}
+"""`;
+  }
+
+  // Default: original post
+  return `You are a Japanese language assistant.
 Read the following Japanese social media post by a Japanese actor.
 Return ONLY a JSON object in this format:
 {
@@ -37,15 +83,12 @@ Return ONLY a JSON object in this format:
 
 Post:
 """
-${originalText}
+${post.original_text ?? ""}
 """`;
 }
 
-function buildFullAnalysisPrompt(originalText: string): string {
-  return `You are a Japanese language and culture expert. 
-Analyse the following Japanese social media post.
-Return ONLY a JSON object with these fields:
-{
+function buildFullAnalysisPrompt(post: PostRow): string {
+  const analysisShape = `{
   "full_translation": "Natural, readable Traditional Chinese translation",
   "vocab_breakdown": [
     {
@@ -63,11 +106,50 @@ Return ONLY a JSON object with these fields:
   "culture_notes": "Cultural background relevant to this post (Traditional Chinese)",
   "grammar_notes": "1-2 notable grammar patterns used, with explanation (Traditional Chinese)",
   "language_origin": "Any interesting kanji origins or language etymology (Traditional Chinese)"
-}
+}`;
+
+  if (post.post_type === "quote_repost") {
+    return `You are a Japanese language and culture expert.
+The following is a quote repost by a Japanese actor (武田航平).
+Analyse ONLY the actor's own comment (not the quoted post).
+Use the quoted post as context only — do not include vocabulary or grammar from the quoted post.
+
+Return ONLY a JSON object with these fields:
+${analysisShape}
+
+Actor's comment:
+"""
+${post.original_text ?? ""}
+"""
+
+Quoted post${post.retweeted_author ? ` (by ${post.retweeted_author})` : ""} — for context only:
+"""
+${post.retweeted_text ?? ""}
+"""`;
+  }
+
+  if (post.post_type === "reply") {
+    return `You are a Japanese language and culture expert.
+Analyse the following reply posted by a Japanese actor (武田航平) on social media.
+
+Return ONLY a JSON object with these fields:
+${analysisShape}
+
+Reply:
+"""
+${post.original_text ?? ""}
+"""`;
+  }
+
+  // Default: original post
+  return `You are a Japanese language and culture expert.
+Analyse the following Japanese social media post.
+Return ONLY a JSON object with these fields:
+${analysisShape}
 
 Post:
 """
-${originalText}
+${post.original_text ?? ""}
 """`;
 }
 
@@ -91,16 +173,23 @@ router.post("/process-post", async (req, res) => {
 
   const { data: post } = await supabase
     .from("posts")
-    .select("original_text")
+    .select("original_text, post_type, retweeted_text, retweeted_author")
     .eq("id", postId)
     .single();
 
   if (!post) { res.status(404).json({ error: "Post not found" }); return; }
 
+  // Pure retweets have no idol commentary — skip AI analysis
+  if (post.post_type === "retweet") {
+    await supabase.from("posts").update({ status: "skipped" }).eq("id", postId);
+    res.json({ ok: true, skipped: true, reason: "Pure retweet — no idol commentary to analyse" });
+    return;
+  }
+
   try {
     const [summaryRaw, fullAnalysisRaw] = await Promise.all([
-      callOpenRouter(buildSummaryPrompt(post.original_text)),
-      callOpenRouter(buildFullAnalysisPrompt(post.original_text)),
+      callOpenRouter(buildSummaryPrompt(post)),
+      callOpenRouter(buildFullAnalysisPrompt(post)),
     ]);
 
     const summaryObj = JSON.parse(summaryRaw);
@@ -123,3 +212,4 @@ router.post("/process-post", async (req, res) => {
 });
 
 export default router;
+
