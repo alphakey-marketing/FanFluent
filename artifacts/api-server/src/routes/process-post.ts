@@ -3,20 +3,36 @@ import { createSupabaseClient } from "../lib/supabase";
 
 const router = Router();
 
+const OPENROUTER_TIMEOUT_MS = 90_000;
+
 async function callOpenRouter(prompt: string, model = "openai/gpt-4o"): Promise<string> {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + process.env["OPENROUTER_API_KEY"],
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env["APP_URL"] ?? "",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + process.env["OPENROUTER_API_KEY"],
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env["APP_URL"] ?? "",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === "AbortError") {
+      throw new Error(`OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!res.ok) {
     const errorText = await res.text();
@@ -24,7 +40,9 @@ async function callOpenRouter(prompt: string, model = "openai/gpt-4o"): Promise<
   }
 
   const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-  return data.choices[0].message.content;
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("OpenRouter returned an empty response");
+  return content;
 }
 
 type PostRow = {

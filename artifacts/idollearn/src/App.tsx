@@ -6,6 +6,7 @@ import LoginPage from "@/pages/login";
 import AuthCallbackPage from "@/pages/auth-callback";
 import FeedPage from "@/pages/feed";
 import AdminPage from "@/pages/admin";
+import AdminPreviewPage from "@/pages/admin-preview";
 import PostDetailPage from "@/pages/post-detail";
 import UpgradePage from "@/pages/upgrade";
 
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/auth/callback" component={AuthCallbackPage} />
       <Route path="/feed" component={FeedPage} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/admin/preview/:id" component={AdminPreviewPage} />
       <Route path="/upgrade" component={UpgradePage} />
       <Route path="/post/:id" component={PostDetailPage} />
       <Route component={NotFound} />

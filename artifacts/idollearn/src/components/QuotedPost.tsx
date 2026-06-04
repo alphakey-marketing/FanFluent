@@ -35,9 +35,10 @@ export default function QuotedPost({
         {retweeted_text}
       </p>
       {retweeted_translation && (
-        <p className="text-sm text-[#01696f] leading-relaxed border-t border-gray-200 pt-1.5">
-          {retweeted_translation}
-        </p>
+        <div className="border-t border-gray-200 pt-1.5 space-y-0.5">
+          <p className="text-[10px] font-semibold text-[#01696f] uppercase tracking-wide">中文翻譯</p>
+          <p className="text-sm text-[#01696f] leading-relaxed">{retweeted_translation}</p>
+        </div>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,7 @@ const POST_TYPE_LABELS: Record<PostType, string> = {
 export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
   const [ingestLoading, setIngestLoading] = useState(false);
   const [ingestResult, setIngestResult] = useState<IngestResult | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
@@ -113,22 +115,44 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
 
   async function handleAction(postId: string, action: "process" | "publish" | "unpublish") {
     setActionLoading(postId + action);
+    setActionErrors((prev) => { const next = { ...prev }; delete next[postId]; return next; });
     try {
       if (action === "process") {
-        await authedFetch("/api/process-post", {
+        const res = await authedFetch("/api/process-post", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ postId }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({})) as { error?: string };
+          setActionErrors((prev) => ({
+            ...prev,
+            [postId]: data.error ?? `AI 分析失敗（${res.status}）`,
+          }));
+          return;
+        }
       } else {
         const status = action === "publish" ? "published" : "processed";
-        await authedFetch("/api/admin/posts", {
+        const res = await authedFetch("/api/admin/posts", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ postId, status }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({})) as { error?: string };
+          setActionErrors((prev) => ({
+            ...prev,
+            [postId]: data.error ?? `操作失敗（${res.status}）`,
+          }));
+          return;
+        }
       }
       onRefresh();
+    } catch (err) {
+      setActionErrors((prev) => ({
+        ...prev,
+        [postId]: err instanceof Error ? err.message : "網路錯誤，請重試",
+      }));
     } finally {
       setActionLoading(null);
     }
@@ -395,35 +419,60 @@ export default function AdminPostForm({ posts, onRefresh }: AdminPostFormProps) 
                       <Badge variant="outline">{post.status}</Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        {(post.status === "pending" || post.status === "skipped") && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={actionLoading === post.id + "process"}
-                            onClick={() => handleAction(post.id, "process")}
-                          >
-                            AI 分析
-                          </Button>
-                        )}
-                        {post.status === "processed" && (
-                          <Button
-                            size="sm"
-                            disabled={actionLoading === post.id + "publish"}
-                            onClick={() => handleAction(post.id, "publish")}
-                          >
-                            發佈
-                          </Button>
-                        )}
-                        {post.status === "published" && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={actionLoading === post.id + "unpublish"}
-                            onClick={() => handleAction(post.id, "unpublish")}
-                          >
-                            下架
-                          </Button>
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex gap-2 flex-wrap">
+                          {(post.status === "pending" || post.status === "skipped") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actionLoading === post.id + "process"}
+                              onClick={() => handleAction(post.id, "process")}
+                            >
+                              {actionLoading === post.id + "process" ? "分析中…" : "AI 分析"}
+                            </Button>
+                          )}
+                          {post.status === "processed" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                              >
+                                <Link href={`/admin/preview/${post.id}`}>預覽</Link>
+                              </Button>
+                              <Button
+                                size="sm"
+                                disabled={actionLoading === post.id + "publish"}
+                                onClick={() => handleAction(post.id, "publish")}
+                              >
+                                {actionLoading === post.id + "publish" ? "發佈中…" : "發佈"}
+                              </Button>
+                            </>
+                          )}
+                          {post.status === "published" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                              >
+                                <Link href={`/admin/preview/${post.id}`}>預覽</Link>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={actionLoading === post.id + "unpublish"}
+                                onClick={() => handleAction(post.id, "unpublish")}
+                              >
+                                {actionLoading === post.id + "unpublish" ? "下架中…" : "下架"}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                        {actionErrors[post.id] && (
+                          <p className="text-xs text-red-600 max-w-[200px]">
+                            ⚠ {actionErrors[post.id]}
+                          </p>
                         )}
                       </div>
                     </td>

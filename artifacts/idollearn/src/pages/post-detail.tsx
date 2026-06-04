@@ -168,6 +168,18 @@ export default function PostDetailPage() {
           )}
         </section>
 
+        {/* Pure retweet: show the TC translation prominently */}
+        {isRetweet && post.retweeted_translation && (
+          <section className="rounded-xl border border-gray-200 bg-[#f7f6f2] p-5">
+            <h2 className="text-xs font-semibold text-[#01696f] mb-2 uppercase tracking-wide">
+              中文翻譯
+            </h2>
+            <p className="text-gray-700 text-sm leading-relaxed">
+              {post.retweeted_translation}
+            </p>
+          </section>
+        )}
+
         {/* Summary — always shown for analysable posts; server returns summary-only for free tier */}
         {!isRetweet && analysis?.summary && (
           <section className="rounded-xl border border-gray-200 bg-[#f7f6f2] p-5">

@@ -18,6 +18,31 @@ async function requireAdmin(authHeader: string | undefined) {
   return { supabase, user, profile };
 }
 
+// GET /api/admin/posts/:id — single post + analysis for preview (admin only)
+router.get("/admin/posts/:id", async (req, res) => {
+  const { supabase, user, profile } = await requireAdmin(req.headers.authorization);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (profile?.tier !== "admin") { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const { id } = req.params;
+
+  const { data: post, error: postError } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (postError || !post) { res.status(404).json({ error: "Post not found" }); return; }
+
+  const { data: analysis } = await supabase
+    .from("post_analysis")
+    .select("*")
+    .eq("post_id", id)
+    .single();
+
+  res.json({ post, analysis: analysis ?? null });
+});
+
 // GET /api/admin/posts
 router.get("/admin/posts", async (req, res) => {
   const { supabase, user, profile } = await requireAdmin(req.headers.authorization);
