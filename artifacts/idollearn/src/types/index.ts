@@ -11,7 +11,8 @@ export interface Profile {
 }
 
 export type SourcePlatform = "x" | "instagram";
-export type PostStatus = "pending" | "processed" | "published";
+export type PostStatus = "pending" | "processed" | "published" | "skipped";
+export type PostType = "post" | "reply" | "retweet" | "quote_repost";
 
 export interface Post {
   id: string;
@@ -23,6 +24,11 @@ export interface Post {
   image_url: string | null;
   tags: string[] | null;
   status: PostStatus;
+  post_type: PostType;
+  retweeted_text: string | null;
+  retweeted_author: string | null;
+  retweeted_url: string | null;
+  retweeted_translation: string | null;
   created_at: string;
   imported_by: string | null;
 }
@@ -60,4 +66,11 @@ export type AnalysisResponse = PostAnalysis | FreeAnalysis;
 
 export interface PostWithAnalysis extends Post {
   post_analysis?: PostAnalysis | null;
+}
+
+export interface IngestResult {
+  total: number;
+  newly_imported: number;
+  duplicates_skipped: number;
+  failed: number;
 }

@@ -39,23 +39,52 @@ router.post("/admin/posts", async (req, res) => {
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
   if (profile?.tier !== "admin") { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const { original_text, source_platform, source_url, post_date, image_url } = req.body;
+  const {
+    original_text,
+    source_platform,
+    source_url,
+    post_date,
+    image_url,
+    post_type = "post",
+    retweeted_text,
+    retweeted_author,
+    retweeted_url,
+  } = req.body;
 
-  if (!original_text || !source_platform) {
+  const validPostTypes = ["post", "reply", "retweet", "quote_repost"];
+  if (!source_platform) {
+    res.status(400).json({ error: "Missing required fields" });
+    return;
+  }
+  if (!validPostTypes.includes(post_type)) {
+    res.status(400).json({ error: "Invalid post_type" });
+    return;
+  }
+  // Pure retweets with no idol commentary are allowed (no original_text required)
+  if (post_type !== "retweet" && !original_text) {
     res.status(400).json({ error: "Missing required fields" });
     return;
   }
 
+  // All imported posts start as "pending" regardless of type.
+  // Pure retweets will generate a TC translation during AI processing
+  // rather than being skipped entirely.
+  const initialStatus = "pending";
+
   const { data: post, error } = await supabase
     .from("posts")
     .insert({
-      original_text,
+      original_text: original_text || null,
       source_platform,
       source_url: source_url || null,
       post_date: post_date || null,
       image_url: image_url || null,
+      post_type,
+      retweeted_text: retweeted_text || null,
+      retweeted_author: retweeted_author || null,
+      retweeted_url: retweeted_url || null,
       imported_by: user.id,
-      status: "pending",
+      status: initialStatus,
     })
     .select()
     .single();

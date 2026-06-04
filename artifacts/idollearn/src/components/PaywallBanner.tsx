@@ -2,13 +2,13 @@ import { Button } from "@/components/ui/button";
 import { Lock, Star, Zap } from "lucide-react";
 
 interface PaywallBannerProps {
-  monthlyUrl: string;
-  lifetimeUrl: string;
+  proUrl: string | null;
+  maxUrl: string | null;
 }
 
 export default function PaywallBanner({
-  monthlyUrl,
-  lifetimeUrl,
+  proUrl,
+  maxUrl,
 }: PaywallBannerProps) {
   return (
     <div className="rounded-xl border-2 border-[#01696f]/20 bg-white p-6 flex flex-col gap-5">
@@ -33,7 +33,7 @@ export default function PaywallBanner({
             Unlock the full FanFluent experience. Get unlimited access to fan-powered language lessons, expanded vocabulary packs, and ad-free learning — all designed around the content you love.
           </p>
           <Button asChild className="mt-auto bg-[#01696f] hover:bg-[#01696f]/90 text-white w-full">
-            <a href={monthlyUrl} target="_blank" rel="noopener noreferrer">
+            <a href={proUrl ?? "#"} target="_blank" rel="noopener noreferrer">
               月費訂閱
             </a>
           </Button>
@@ -50,7 +50,7 @@ export default function PaywallBanner({
             The ultimate FanFluent membership. Get everything in Pro, plus early access to new content, advanced grammar deep-dives, community challenges, and direct access to native speaker sessions.
           </p>
           <Button asChild className="mt-auto bg-[#01696f] hover:bg-[#01696f]/90 text-white w-full">
-            <a href={lifetimeUrl} target="_blank" rel="noopener noreferrer">
+            <a href={maxUrl ?? "#"} target="_blank" rel="noopener noreferrer">
               終身購買
             </a>
           </Button>

@@ -7,6 +7,7 @@ import AuthCallbackPage from "@/pages/auth-callback";
 import FeedPage from "@/pages/feed";
 import AdminPage from "@/pages/admin";
 import PostDetailPage from "@/pages/post-detail";
+import UpgradePage from "@/pages/upgrade";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/auth/callback" component={AuthCallbackPage} />
       <Route path="/feed" component={FeedPage} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/upgrade" component={UpgradePage} />
       <Route path="/post/:id" component={PostDetailPage} />
       <Route component={NotFound} />
     </Switch>
