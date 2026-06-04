@@ -4,12 +4,14 @@ interface QuotedPostProps {
   retweeted_text: NonNullable<Post["retweeted_text"]>;
   retweeted_author: Post["retweeted_author"];
   retweeted_url: Post["retweeted_url"];
+  retweeted_translation?: Post["retweeted_translation"];
 }
 
 export default function QuotedPost({
   retweeted_text,
   retweeted_author,
   retweeted_url,
+  retweeted_translation,
 }: QuotedPostProps) {
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-1.5">
@@ -32,6 +34,11 @@ export default function QuotedPost({
       <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap font-japanese">
         {retweeted_text}
       </p>
+      {retweeted_translation && (
+        <p className="text-sm text-[#01696f] leading-relaxed border-t border-gray-200 pt-1.5">
+          {retweeted_translation}
+        </p>
+      )}
     </div>
   );
 }

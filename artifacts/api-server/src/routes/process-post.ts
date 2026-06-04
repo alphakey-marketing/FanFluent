@@ -153,6 +153,22 @@ ${post.original_text ?? ""}
 """`;
 }
 
+function buildRetweetedTranslationPrompt(post: PostRow): string {
+  return `You are a Japanese language assistant.
+Translate the following Japanese social media post into Traditional Chinese (繁體中文).
+Provide a natural, readable translation so the reader can understand what the post is about.
+
+Return ONLY a JSON object in this format:
+{
+  "translation": "Natural Traditional Chinese translation of the post"
+}
+
+Post${post.retweeted_author ? ` (by ${post.retweeted_author})` : ""}:
+"""
+${post.retweeted_text ?? ""}
+"""`;
+}
+
 // POST /api/process-post
 router.post("/process-post", async (req, res) => {
   const token = req.headers.authorization?.replace("Bearer ", "");
@@ -179,18 +195,31 @@ router.post("/process-post", async (req, res) => {
 
   if (!post) { res.status(404).json({ error: "Post not found" }); return; }
 
-  // Pure retweets have no idol commentary — skip AI analysis
-  if (post.post_type === "retweet") {
-    await supabase.from("posts").update({ status: "skipped" }).eq("id", postId);
-    res.json({ ok: true, skipped: true, reason: "Pure retweet — no idol commentary to analyse" });
-    return;
-  }
-
   try {
-    const [summaryRaw, fullAnalysisRaw] = await Promise.all([
+    // Pure retweets: translate the retweeted content into Traditional Chinese so users
+    // understand the repost, but do NOT generate vocabulary/grammar/culture analysis
+    // (the idol added no original commentary to learn from).
+    if (post.post_type === "retweet") {
+      const translationRaw = await callOpenRouter(buildRetweetedTranslationPrompt(post));
+      const translationObj = JSON.parse(translationRaw);
+      await supabase
+        .from("posts")
+        .update({ status: "processed", retweeted_translation: translationObj.translation ?? null })
+        .eq("id", postId);
+      res.json({ ok: true, retweet_translated: true });
+      return;
+    }
+
+    const aiCalls: [Promise<string>, Promise<string>, Promise<string | null>] = [
       callOpenRouter(buildSummaryPrompt(post)),
       callOpenRouter(buildFullAnalysisPrompt(post)),
-    ]);
+      // For quote reposts, also translate the quoted source post
+      post.post_type === "quote_repost" && post.retweeted_text
+        ? callOpenRouter(buildRetweetedTranslationPrompt(post))
+        : Promise.resolve(null),
+    ];
+
+    const [summaryRaw, fullAnalysisRaw, retweetedTranslationRaw] = await Promise.all(aiCalls);
 
     const summaryObj = JSON.parse(summaryRaw);
     const fullAnalysis = JSON.parse(fullAnalysisRaw);
@@ -204,7 +233,15 @@ router.post("/process-post", async (req, res) => {
 
     if (upsertError) { res.status(500).json({ error: upsertError.message }); return; }
 
-    await supabase.from("posts").update({ status: "processed" }).eq("id", postId);
+    const retweetedTranslation = retweetedTranslationRaw
+      ? (JSON.parse(retweetedTranslationRaw) as { translation?: string }).translation ?? null
+      : null;
+
+    await supabase.from("posts").update({
+      status: "processed",
+      ...(retweetedTranslation !== null ? { retweeted_translation: retweetedTranslation } : {}),
+    }).eq("id", postId);
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: String(err) });

@@ -77,10 +77,11 @@ export default function PostCard({ post, analysis, userTier }: PostCardProps) {
             retweeted_text={post.retweeted_text}
             retweeted_author={post.retweeted_author}
             retweeted_url={post.retweeted_url}
+            retweeted_translation={post.retweeted_translation}
           />
         )}
 
-        {/* AI summary — not shown for pure retweets (status: skipped) */}
+        {/* AI summary — not shown for pure retweets (translation is embedded in QuotedPost) */}
         {post.post_type !== "retweet" && (
           analysis ? (
             <div className="rounded-md bg-[#f7f6f2] p-3">

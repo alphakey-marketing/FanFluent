@@ -163,18 +163,10 @@ export default function PostDetailPage() {
               retweeted_text={post.retweeted_text}
               retweeted_author={post.retweeted_author}
               retweeted_url={post.retweeted_url}
+              retweeted_translation={post.retweeted_translation}
             />
           )}
         </section>
-
-        {/* Pure retweet — no analysis available */}
-        {isRetweet && (
-          <section className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-            <p className="text-sm text-gray-500 text-center">
-              此貼文為純轉發，無 AI 分析內容。
-            </p>
-          </section>
-        )}
 
         {/* Summary — always shown for analysable posts; server returns summary-only for free tier */}
         {!isRetweet && analysis?.summary && (

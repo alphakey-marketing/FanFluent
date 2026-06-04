@@ -28,6 +28,7 @@ export interface Post {
   retweeted_text: string | null;
   retweeted_author: string | null;
   retweeted_url: string | null;
+  retweeted_translation: string | null;
   created_at: string;
   imported_by: string | null;
 }
@@ -65,4 +66,11 @@ export type AnalysisResponse = PostAnalysis | FreeAnalysis;
 
 export interface PostWithAnalysis extends Post {
   post_analysis?: PostAnalysis | null;
+}
+
+export interface IngestResult {
+  total: number;
+  newly_imported: number;
+  duplicates_skipped: number;
+  failed: number;
 }

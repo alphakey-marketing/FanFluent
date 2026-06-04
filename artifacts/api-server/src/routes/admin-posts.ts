@@ -66,8 +66,10 @@ router.post("/admin/posts", async (req, res) => {
     return;
   }
 
-  // Pure retweets are auto-skipped — no learnable idol language to analyse
-  const initialStatus = post_type === "retweet" ? "skipped" : "pending";
+  // All imported posts start as "pending" regardless of type.
+  // Pure retweets will generate a TC translation during AI processing
+  // rather than being skipped entirely.
+  const initialStatus = "pending";
 
   const { data: post, error } = await supabase
     .from("posts")
