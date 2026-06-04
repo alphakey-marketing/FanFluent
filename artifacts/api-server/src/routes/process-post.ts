@@ -247,7 +247,7 @@ router.post("/process-post", async (req, res) => {
       summary: summaryObj.summary,
       ...fullAnalysis,
       model_used: "openai/gpt-4o",
-    });
+    }, { onConflict: "post_id" });
 
     if (upsertError) { res.status(500).json({ error: upsertError.message }); return; }
 
