@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createSupabaseClient } from "../lib/supabase";
+import { createSupabaseClient, createAdminClient } from "../lib/supabase";
 
 const router = Router();
 
@@ -213,6 +213,8 @@ router.post("/process-post", async (req, res) => {
 
   if (!post) { res.status(404).json({ error: "Post not found" }); return; }
 
+  const adminClient = createAdminClient();
+
   try {
     // Pure retweets: translate the retweeted content into Traditional Chinese so users
     // understand the repost, but do NOT generate vocabulary/grammar/culture analysis
@@ -220,7 +222,7 @@ router.post("/process-post", async (req, res) => {
     if (post.post_type === "retweet") {
       const translationRaw = await callOpenRouter(buildRetweetedTranslationPrompt(post));
       const translationObj = JSON.parse(translationRaw);
-      await supabase
+      await adminClient
         .from("posts")
         .update({ status: "processed", retweeted_translation: translationObj.translation ?? null })
         .eq("id", postId);
@@ -242,7 +244,7 @@ router.post("/process-post", async (req, res) => {
     const summaryObj = JSON.parse(summaryRaw);
     const fullAnalysis = JSON.parse(fullAnalysisRaw);
 
-    const { error: upsertError } = await supabase.from("post_analysis").upsert({
+    const { error: upsertError } = await adminClient.from("post_analysis").upsert({
       post_id: postId,
       summary: summaryObj.summary,
       ...fullAnalysis,
@@ -255,7 +257,7 @@ router.post("/process-post", async (req, res) => {
       ? (JSON.parse(retweetedTranslationRaw) as { translation?: string }).translation ?? null
       : null;
 
-    await supabase.from("posts").update({
+    await adminClient.from("posts").update({
       status: "processed",
       ...(retweetedTranslation !== null ? { retweeted_translation: retweetedTranslation } : {}),
     }).eq("id", postId);
