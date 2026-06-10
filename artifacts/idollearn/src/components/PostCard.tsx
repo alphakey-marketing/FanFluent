@@ -9,7 +9,7 @@ import { Lock, Repeat2, Quote, Reply } from "lucide-react";
 
 interface PostCardProps {
   post: Post;
-  analysis: Pick<PostAnalysis, "summary"> | null;
+  analysis: Pick<PostAnalysis, "summary" | "vocab_breakdown"> | null;
   userTier: UserTier;
 }
 
@@ -30,6 +30,12 @@ export default function PostCard({ post, analysis, userTier }: PostCardProps) {
 
   const postTypeConfig = POST_TYPE_CONFIG[post.post_type ?? "post"];
 
+  // Teaser vocab hint: first vocab item for free users
+  const teaserVocab =
+    !isPaid && analysis?.vocab_breakdown && analysis.vocab_breakdown.length > 0
+      ? analysis.vocab_breakdown[0]
+      : null;
+
   return (
     <Card className="flex flex-col">
       <CardHeader className="gap-2">
@@ -45,20 +51,11 @@ export default function PostCard({ post, analysis, userTier }: PostCardProps) {
           </div>
           <div className="flex items-center gap-1.5">
             {postTypeConfig && (
-              <Badge
-                className={`border bg-transparent text-xs flex items-center gap-1 ${postTypeConfig.color}`}
-                variant="outline"
-              >
-                {postTypeConfig.icon}
-                {postTypeConfig.label}
+              <Badge variant="outline" className={`text-xs flex items-center gap-1 ${postTypeConfig.color}`}>
+                {postTypeConfig.icon} {postTypeConfig.label}
               </Badge>
             )}
-            <Badge
-              className={`border bg-transparent text-xs ${platformColor}`}
-              variant="outline"
-            >
-              {platformLabel}
-            </Badge>
+            <Badge variant="outline" className={`text-xs ${platformColor}`}>{platformLabel}</Badge>
           </div>
         </div>
       </CardHeader>
@@ -66,46 +63,49 @@ export default function PostCard({ post, analysis, userTier }: PostCardProps) {
       <CardContent className="flex flex-col gap-3">
         {/* Idol's own text — not present for pure retweets */}
         {post.original_text && (
-          <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap font-japanese">
-            {post.original_text}
-          </p>
+          <p className="text-sm text-gray-800 line-clamp-4 whitespace-pre-wrap">{post.original_text}</p>
         )}
-
         {/* Quoted / retweeted content block */}
         {post.retweeted_text && (
           <QuotedPost
-            retweeted_text={post.retweeted_text}
-            retweeted_author={post.retweeted_author}
-            retweeted_url={post.retweeted_url}
-            retweeted_translation={post.retweeted_translation}
+            text={post.retweeted_text}
+            author={post.retweeted_author}
+            url={post.retweeted_url}
+            translation={post.retweeted_translation}
           />
         )}
-
-        {/* AI summary — not shown for pure retweets (translation is embedded in QuotedPost) */}
+        {/* AI summary — not shown for pure retweets */}
         {post.post_type !== "retweet" && (
           analysis ? (
-            <div className="rounded-md bg-[#f7f6f2] p-3">
-              <p className="text-xs font-medium text-[#01696f] mb-1">摘要</p>
-              <p className="text-sm text-gray-700">{analysis.summary}</p>
+            <div className="rounded-md bg-gray-50 border p-2.5 space-y-0.5">
+              <p className="text-xs font-semibold text-gray-500">摘要</p>
+              <p className="text-xs text-gray-700 line-clamp-2">{analysis.summary}</p>
             </div>
           ) : (
-            <div className="rounded-md bg-gray-50 p-3 text-sm text-gray-400 italic">
-              AI 摘要生成中…
-            </div>
+            <p className="text-xs text-gray-400 italic">AI 摘要生成中…</p>
           )
+        )}
+        {/* Teaser vocab hint for free users: blurred first vocab item */}
+        {post.post_type !== "retweet" && teaserVocab && (
+          <div
+            className="rounded-md bg-gray-50 border p-2 blur-[2px] select-none pointer-events-none text-xs text-gray-600"
+            aria-hidden="true"
+          >
+            📖 {teaserVocab.word}《{teaserVocab.reading}》— {teaserVocab.meaning_zh}
+          </div>
         )}
       </CardContent>
 
       {post.post_type !== "retweet" && (
-        <CardFooter className="mt-auto">
+        <CardFooter>
           {isPaid ? (
-            <Button asChild variant="outline" size="sm" className="w-full">
+            <Button size="sm" variant="outline" className="w-full" asChild>
               <Link href={`/post/${post.id}`}>查看完整解析</Link>
             </Button>
           ) : (
-            <Button asChild variant="default" size="sm" className="w-full gap-1">
+            <Button size="sm" variant="outline" className="w-full text-gray-500" asChild>
               <Link href={`/post/${post.id}`}>
-                <Lock className="h-3 w-3" />
+                <Lock className="h-3 w-3 mr-1" />
                 查看完整解析
               </Link>
             </Button>
@@ -115,4 +115,3 @@ export default function PostCard({ post, analysis, userTier }: PostCardProps) {
     </Card>
   );
 }
-
