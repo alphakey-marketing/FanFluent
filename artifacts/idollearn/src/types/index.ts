@@ -62,7 +62,15 @@ export interface FreeAnalysis {
   summary: string;
 }
 
-export type AnalysisResponse = PostAnalysis | FreeAnalysis;
+/** Teaser payload returned for free-tier users — partial content with mosaic flag */
+export interface TeaserAnalysis {
+  summary: string;
+  is_preview: true;
+  full_translation: string | null;
+  vocab_breakdown: VocabItem[] | null;
+}
+
+export type AnalysisResponse = PostAnalysis | TeaserAnalysis | FreeAnalysis;
 
 export interface PostWithAnalysis extends Post {
   post_analysis?: PostAnalysis | null;
