@@ -7,11 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import VocabBreakdown from "@/components/VocabBreakdown";
 import CultureNote from "@/components/CultureNote";
 import GrammarHighlight from "@/components/GrammarHighlight";
-import PaywallBanner from "@/components/PaywallBanner";
+import MosaicOverlay from "@/components/MosaicOverlay";
 import QuotedPost from "@/components/QuotedPost";
 import { formatDate } from "@/lib/utils";
 import { Repeat2, Quote, Reply } from "lucide-react";
-import type { Post, PostAnalysis, PostType, UserTier } from "@/types";
+import type { Post, PostAnalysis, TeaserAnalysis, PostType, UserTier } from "@/types";
 
 const POST_TYPE_LABEL: Record<PostType, { label: string; icon: React.ReactNode } | null> = {
   post: null,
@@ -24,7 +24,7 @@ export default function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const [post, setPost] = useState<Post | null>(null);
-  const [analysis, setAnalysis] = useState<PostAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<PostAnalysis | TeaserAnalysis | null>(null);
   const [userTier, setUserTier] = useState<UserTier>("free");
   const [checkoutLinks, setCheckoutLinks] = useState<{ pro: string | null; max: string | null }>({ pro: null, max: null });
   const [loading, setLoading] = useState(true);
@@ -68,7 +68,7 @@ export default function PostDetailPage() {
       if (!cancelled) {
         if (analysisRes.ok) {
           const data = await analysisRes.json();
-          setAnalysis(data as PostAnalysis);
+          setAnalysis(data as PostAnalysis | TeaserAnalysis);
         }
         setLoading(false);
       }
@@ -80,154 +80,133 @@ export default function PostDetailPage() {
 
   if (loading && !notFound) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-gray-400">
-        載入中…
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-500">載入中…</p>
       </div>
     );
   }
 
   if (notFound || !post) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-gray-400">
-        貼文不存在
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-500">貼文不存在</p>
       </div>
     );
   }
 
   const isPaid = userTier === "paid" || userTier === "admin";
+  const isPreview = !isPaid && analysis != null && "is_preview" in analysis && analysis.is_preview === true;
   const isRetweet = (post.post_type ?? "post") === "retweet";
   const postTypeInfo = POST_TYPE_LABEL[post.post_type ?? "post"];
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-gray-200">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/feed">← 返回</Link>
-          </Button>
-          <h1 className="font-bold text-[#01696f]">武田航平</h1>
+    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <div>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/">← 返回</Link>
+        </Button>
+      </div>
+
+      <h1 className="text-2xl font-bold">武田航平</h1>
+
+      {/* Original post */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <Badge variant="outline" className={post.source_platform === "x" ? "border-gray-900 text-gray-900" : "border-pink-500 text-pink-600"}>
+            {post.source_platform === "x" ? "𝕏" : "Instagram"}
+          </Badge>
+          {postTypeInfo && (
+            <>
+              <span>·</span>
+              <Badge variant="outline" className="flex items-center gap-1">
+                {postTypeInfo.icon} {postTypeInfo.label}
+              </Badge>
+            </>
+          )}
+          <span>·</span>
+          <span>{formatDate(post.post_date)}</span>
+          {post.source_url && (
+            <>
+              <span>·</span>
+              <a href={post.source_url} target="_blank" rel="noopener noreferrer" className="underline">原文連結</a>
+            </>
+          )}
         </div>
-      </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Original post */}
-        <section className="rounded-xl border border-gray-200 bg-white p-6 space-y-3">
-          <div className="flex items-center gap-2 text-xs text-gray-400 flex-wrap">
-            <span className="font-medium text-gray-600">
-              {post.source_platform === "x" ? "𝕏" : "Instagram"}
-            </span>
-            {postTypeInfo && (
-              <>
-                <span>·</span>
-                <Badge
-                  variant="outline"
-                  className="flex items-center gap-1 text-xs py-0 h-5"
-                >
-                  {postTypeInfo.icon}
-                  {postTypeInfo.label}
-                </Badge>
-              </>
-            )}
-            <span>·</span>
-            <span>{formatDate(post.post_date)}</span>
-            {post.source_url && (
-              <>
-                <span>·</span>
-                <a
-                  href={post.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#01696f] underline"
-                >
-                  原文連結
-                </a>
-              </>
-            )}
+        {post.image_url && (
+          <img src={post.image_url} alt="Post image" className="rounded-lg max-w-full" />
+        )}
+        {/* Idol's own text — absent for pure retweets */}
+        {post.original_text && (
+          <p className="text-gray-900 whitespace-pre-wrap">{post.original_text}</p>
+        )}
+        {/* Quoted / retweeted post block */}
+        {post.retweeted_text && (
+          <QuotedPost
+            text={post.retweeted_text}
+            author={post.retweeted_author}
+            url={post.retweeted_url}
+            translation={post.retweeted_translation}
+          />
+        )}
+      </div>
+
+      {/* Pure retweet: show the TC translation prominently */}
+      {isRetweet && post.retweeted_translation && (
+        <div className="rounded-xl border p-4 space-y-2">
+          <h2 className="text-sm font-semibold text-gray-700">中文翻譯</h2>
+          <p className="text-gray-800 whitespace-pre-wrap">{post.retweeted_translation}</p>
+        </div>
+      )}
+
+      {/* Summary — always shown for analysable posts */}
+      {!isRetweet && analysis?.summary && (
+        <div className="rounded-xl border p-4 space-y-2">
+          <h2 className="text-sm font-semibold text-gray-700">AI 摘要</h2>
+          <p className="text-gray-800">{analysis.summary}</p>
+        </div>
+      )}
+
+      {/* Full translation */}
+      {!isRetweet && analysis && "full_translation" in analysis && analysis.full_translation && (
+        isPaid ? (
+          <div className="rounded-xl border p-4 space-y-2">
+            <h2 className="text-sm font-semibold text-gray-700">完整翻譯</h2>
+            <p className="text-gray-800 whitespace-pre-wrap">{analysis.full_translation}</p>
           </div>
-          {post.image_url && (
-            <img
-              src={post.image_url}
-              alt="Post image"
-              className="rounded-lg w-full object-cover max-h-80"
-            />
-          )}
-          {/* Idol's own text — absent for pure retweets */}
-          {post.original_text && (
-            <p className="font-japanese text-lg leading-relaxed whitespace-pre-wrap text-gray-900">
-              {post.original_text}
-            </p>
-          )}
-          {/* Quoted / retweeted post block */}
-          {post.retweeted_text && (
-            <QuotedPost
-              retweeted_text={post.retweeted_text}
-              retweeted_author={post.retweeted_author}
-              retweeted_url={post.retweeted_url}
-              retweeted_translation={post.retweeted_translation}
-            />
-          )}
-        </section>
+        ) : isPreview ? (
+          <MosaicOverlay proUrl={checkoutLinks.pro} maxUrl={checkoutLinks.max}>
+            <div className="rounded-xl border p-4 space-y-2">
+              <h2 className="text-sm font-semibold text-gray-700">完整翻譯</h2>
+              <p className="text-gray-800 whitespace-pre-wrap">{analysis.full_translation}</p>
+            </div>
+          </MosaicOverlay>
+        ) : null
+      )}
 
-        {/* Pure retweet: show the TC translation prominently */}
-        {isRetweet && post.retweeted_translation && (
-          <section className="rounded-xl border border-gray-200 bg-[#f7f6f2] p-5">
-            <h2 className="text-xs font-semibold text-[#01696f] mb-2 uppercase tracking-wide">
-              中文翻譯
-            </h2>
-            <p className="text-gray-700 text-sm leading-relaxed">
-              {post.retweeted_translation}
-            </p>
-          </section>
-        )}
+      {/* Vocab breakdown */}
+      {!isRetweet && analysis && "vocab_breakdown" in analysis && analysis.vocab_breakdown && analysis.vocab_breakdown.length > 0 && (
+        isPaid ? (
+          <VocabBreakdown vocab={analysis.vocab_breakdown} />
+        ) : isPreview ? (
+          <MosaicOverlay proUrl={checkoutLinks.pro} maxUrl={checkoutLinks.max}>
+            <VocabBreakdown vocab={analysis.vocab_breakdown} />
+          </MosaicOverlay>
+        ) : null
+      )}
 
-        {/* Summary — always shown for analysable posts; server returns summary-only for free tier */}
-        {!isRetweet && analysis?.summary && (
-          <section className="rounded-xl border border-gray-200 bg-[#f7f6f2] p-5">
-            <h2 className="text-xs font-semibold text-[#01696f] mb-2 uppercase tracking-wide">
-              AI 摘要
-            </h2>
-            <p className="text-gray-700 text-sm">{analysis.summary}</p>
-          </section>
-        )}
-
-        {/* Paid content — only present in API response for paid/admin tier */}
-        {!isRetweet && isPaid && analysis ? (
-          <>
-            {analysis.full_translation && (
-              <section className="rounded-xl border border-gray-200 bg-white p-5">
-                <h2 className="text-xs font-semibold text-[#01696f] mb-2 uppercase tracking-wide">
-                  完整翻譯
-                </h2>
-                <p className="text-gray-800 leading-relaxed">
-                  {analysis.full_translation}
-                </p>
-              </section>
-            )}
-
-            {analysis.vocab_breakdown && analysis.vocab_breakdown.length > 0 && (
-              <VocabBreakdown vocab={analysis.vocab_breakdown} />
-            )}
-
-            {analysis.culture_notes && (
-              <CultureNote notes={analysis.culture_notes} />
-            )}
-
-            {analysis.grammar_notes && (
-              <GrammarHighlight
-                grammarNotes={analysis.grammar_notes}
-                languageOrigin={analysis.language_origin ?? null}
-              />
-            )}
-          </>
-        ) : (
-          !isRetweet && !isPaid && (
-            <PaywallBanner
-              proUrl={checkoutLinks.pro}
-              maxUrl={checkoutLinks.max}
-            />
-          )
-        )}
-      </main>
+      {/* Grammar & Culture — hint labels for free users, full content for paid */}
+      {!isRetweet && isPaid && analysis && "grammar_notes" in analysis && analysis.grammar_notes && (
+        <GrammarHighlight notes={analysis.grammar_notes} />
+      )}
+      {!isRetweet && isPaid && analysis && "culture_notes" in analysis && analysis.culture_notes && (
+        <CultureNote notes={analysis.culture_notes} />
+      )}
+      {!isRetweet && !isPaid && (
+        <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center text-gray-400 text-sm">
+          🔒 文法解析 &amp; 文化背景說明（升級後解鎖）
+        </div>
+      )}
     </div>
   );
 }
