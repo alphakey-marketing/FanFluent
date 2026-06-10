@@ -3,6 +3,20 @@ import { createSupabaseClient } from "../lib/supabase";
 
 const router = Router();
 
+/** Returns the first `maxChars` characters of a string, ending at a sentence boundary if possible. */
+function teaserSlice(text: string | null, maxChars = 120): string | null {
+  if (!text) return null;
+  if (text.length <= maxChars) return text;
+  // Try to break at a sentence-ending punctuation within the limit
+  const cut = text.slice(0, maxChars);
+  const lastBreak = Math.max(
+    cut.lastIndexOf("。"),
+    cut.lastIndexOf("."),
+    cut.lastIndexOf("\n"),
+  );
+  return lastBreak > 20 ? text.slice(0, lastBreak + 1) : cut;
+}
+
 // GET /api/post-analysis/:id
 router.get("/post-analysis/:id", async (req, res) => {
   const { id } = req.params;
@@ -27,18 +41,25 @@ router.get("/post-analysis/:id", async (req, res) => {
   if (error || !analysis) { res.status(404).json({ error: "Not found" }); return; }
 
   if (profile?.tier === "free") {
-    // Return teaser: summary + first sentence of translation + first 2 vocab items
+    // Teaser payload for free tier:
+    // - summary: full
+    // - full_translation: first sentence only
+    // - vocab_breakdown: ALL items (shown fully as a hook)
+    // - culture_notes: first ~120 chars (partially mosaiced on frontend)
+    // - grammar_notes: first ~120 chars (partially mosaiced on frontend)
+    // - language_origin: first ~120 chars (partially mosaiced on frontend)
     const teaserTranslation = analysis.full_translation
-      ? (analysis.full_translation.split("。")[0] ?? "") + "。\u2026"
+      ? (analysis.full_translation.split("。")[0] ?? "") + "。…"
       : null;
-    const teaserVocab = Array.isArray(analysis.vocab_breakdown)
-      ? analysis.vocab_breakdown.slice(0, 2)
-      : null;
+
     res.json({
       summary: analysis.summary,
       is_preview: true,
       full_translation: teaserTranslation,
-      vocab_breakdown: teaserVocab,
+      vocab_breakdown: analysis.vocab_breakdown ?? null,
+      culture_notes: teaserSlice(analysis.culture_notes),
+      grammar_notes: teaserSlice(analysis.grammar_notes),
+      language_origin: teaserSlice(analysis.language_origin),
     });
     return;
   }
