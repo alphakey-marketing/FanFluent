@@ -27,7 +27,19 @@ router.get("/post-analysis/:id", async (req, res) => {
   if (error || !analysis) { res.status(404).json({ error: "Not found" }); return; }
 
   if (profile?.tier === "free") {
-    res.json({ summary: analysis.summary });
+    // Return teaser: summary + first sentence of translation + first 2 vocab items
+    const teaserTranslation = analysis.full_translation
+      ? (analysis.full_translation.split("。")[0] ?? "") + "。\u2026"
+      : null;
+    const teaserVocab = Array.isArray(analysis.vocab_breakdown)
+      ? analysis.vocab_breakdown.slice(0, 2)
+      : null;
+    res.json({
+      summary: analysis.summary,
+      is_preview: true,
+      full_translation: teaserTranslation,
+      vocab_breakdown: teaserVocab,
+    });
     return;
   }
 
