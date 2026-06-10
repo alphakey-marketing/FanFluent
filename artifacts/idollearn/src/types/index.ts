@@ -62,12 +62,24 @@ export interface FreeAnalysis {
   summary: string;
 }
 
-/** Teaser payload returned for free-tier users — partial content with mosaic flag */
+/**
+ * Teaser payload returned for free-tier users.
+ * - vocab_breakdown: ALL items (shown in full as a hook)
+ * - full_translation: first sentence only, then mosaiced
+ * - culture_notes / grammar_notes / language_origin: first ~120 chars,
+ *   shown as partial text with a mosaic fade overlay
+ */
 export interface TeaserAnalysis {
   summary: string;
   is_preview: true;
   full_translation: string | null;
   vocab_breakdown: VocabItem[] | null;
+  /** Truncated teaser — remainder is hidden behind mosaic on the frontend */
+  culture_notes: string | null;
+  /** Truncated teaser — remainder is hidden behind mosaic on the frontend */
+  grammar_notes: string | null;
+  /** Truncated teaser — remainder is hidden behind mosaic on the frontend */
+  language_origin: string | null;
 }
 
 export type AnalysisResponse = PostAnalysis | TeaserAnalysis | FreeAnalysis;
