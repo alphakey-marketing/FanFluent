@@ -3,6 +3,9 @@ import { createSupabaseClient } from "../lib/supabase";
 
 const router = Router();
 
+/** Vocab items sent to free-tier users (the rest is mosaiced/withheld). */
+const FREE_VOCAB_TEASER = 3;
+
 /** Returns the first `maxChars` characters of a string, ending at a sentence boundary if possible. */
 function teaserSlice(text: string | null, maxChars = 120): string | null {
   if (!text) return null;
@@ -41,22 +44,23 @@ router.get("/post-analysis/:id", async (req, res) => {
   if (error || !analysis) { res.status(404).json({ error: "Not found" }); return; }
 
   if (profile?.tier === "free") {
-    // Teaser payload for free tier:
+    // Teaser payload for free tier — only a small, truncated slice is sent so the
+    // full content never reaches the client. The frontend reveals the top sliver
+    // clearly and mosaics the rest:
     // - summary: full
-    // - full_translation: first sentence only
-    // - vocab_breakdown: ALL items (shown fully as a hook)
-    // - culture_notes: first ~120 chars (partially mosaiced on frontend)
-    // - grammar_notes: first ~120 chars (partially mosaiced on frontend)
-    // - language_origin: first ~120 chars (partially mosaiced on frontend)
-    const teaserTranslation = analysis.full_translation
-      ? (analysis.full_translation.split("。")[0] ?? "") + "。…"
+    // - full_translation: first ~60% of characters (rest withheld)
+    // - vocab_breakdown: first few items only (rest withheld)
+    // - culture_notes / grammar_notes / language_origin: first ~120 chars
+    const translation = analysis.full_translation;
+    const teaserTranslation = translation
+      ? translation.slice(0, Math.max(12, Math.ceil(translation.length * 0.6)))
       : null;
 
     res.json({
       summary: analysis.summary,
       is_preview: true,
       full_translation: teaserTranslation,
-      vocab_breakdown: analysis.vocab_breakdown ?? null,
+      vocab_breakdown: (analysis.vocab_breakdown ?? null)?.slice(0, FREE_VOCAB_TEASER) ?? null,
       culture_notes: teaserSlice(analysis.culture_notes),
       grammar_notes: teaserSlice(analysis.grammar_notes),
       language_origin: teaserSlice(analysis.language_origin),

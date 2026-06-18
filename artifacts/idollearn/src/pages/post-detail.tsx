@@ -167,45 +167,61 @@ export default function PostDetailPage() {
         </div>
       )}
 
-      {/* Full translation */}
+      {/* Full translation — paid sees all; free sees the top sliver, rest mosaiced */}
       {!isRetweet && analysis && "full_translation" in analysis && analysis.full_translation && (
         isPaid ? (
           <div className="rounded-xl border p-4 space-y-2">
             <h2 className="text-sm font-semibold text-gray-700">完整翻譯</h2>
             <p className="text-gray-800 whitespace-pre-wrap">{analysis.full_translation}</p>
           </div>
-        ) : isPreview ? (
-          <MosaicOverlay proUrl={checkoutLinks.pro} maxUrl={checkoutLinks.max}>
+        ) : (
+          <MosaicOverlay proUrl={checkoutLinks.pro} maxUrl={checkoutLinks.max} revealRatio={0.35} maxHeightPx={180}>
             <div className="rounded-xl border p-4 space-y-2">
               <h2 className="text-sm font-semibold text-gray-700">完整翻譯</h2>
               <p className="text-gray-800 whitespace-pre-wrap">{analysis.full_translation}</p>
             </div>
           </MosaicOverlay>
-        ) : null
+        )
       )}
 
-      {/* Vocab breakdown */}
+      {/* Vocab breakdown — paid sees all; free sees the first row, rest mosaiced */}
       {!isRetweet && analysis && "vocab_breakdown" in analysis && analysis.vocab_breakdown && analysis.vocab_breakdown.length > 0 && (
         isPaid ? (
           <VocabBreakdown vocab={analysis.vocab_breakdown} />
-        ) : isPreview ? (
-          <MosaicOverlay proUrl={checkoutLinks.pro} maxUrl={checkoutLinks.max}>
+        ) : (
+          <MosaicOverlay proUrl={checkoutLinks.pro} maxUrl={checkoutLinks.max} revealRatio={0.35} maxHeightPx={260}>
             <VocabBreakdown vocab={analysis.vocab_breakdown} />
           </MosaicOverlay>
-        ) : null
+        )
       )}
 
-      {/* Grammar & Culture — hint labels for free users, full content for paid */}
+      {/* Grammar & Culture — paid sees full; free sees the top sliver, rest mosaiced */}
       {!isRetweet && isPaid && analysis && "grammar_notes" in analysis && analysis.grammar_notes && (
-        <GrammarHighlight notes={analysis.grammar_notes} />
+        <GrammarHighlight
+          grammarNotes={analysis.grammar_notes}
+          languageOrigin={"language_origin" in analysis ? analysis.language_origin : null}
+        />
       )}
       {!isRetweet && isPaid && analysis && "culture_notes" in analysis && analysis.culture_notes && (
         <CultureNote notes={analysis.culture_notes} />
       )}
-      {!isRetweet && !isPaid && (
-        <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center text-gray-400 text-sm">
-          🔒 文法解析 &amp; 文化背景說明（升級後解鎖）
-        </div>
+      {!isRetweet && isPreview && analysis && (analysis.grammar_notes || analysis.culture_notes) && (
+        <MosaicOverlay proUrl={checkoutLinks.pro} maxUrl={checkoutLinks.max} revealRatio={0.35} maxHeightPx={200}>
+          <div className="rounded-xl border p-4 space-y-3">
+            {analysis.grammar_notes && (
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-[#01696f]">📝 文法解析</h2>
+                <p className="text-sm text-gray-700 leading-relaxed">{analysis.grammar_notes}</p>
+              </div>
+            )}
+            {analysis.culture_notes && (
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-[#01696f]">🎌 文化背景</h2>
+                <p className="text-sm text-gray-700 leading-relaxed">{analysis.culture_notes}</p>
+              </div>
+            )}
+          </div>
+        </MosaicOverlay>
       )}
     </div>
   );
